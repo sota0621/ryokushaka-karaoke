@@ -457,4 +457,373 @@
         
         <div class="random-display" id="randomResult">
           <i class="fa-solid fa-dice" style="font-size: 3rem; color: var(--primary); opacity: 0.3; margin-bottom: 8px;"></i>
-          <p style="color: var(--text-muted); font-size: 0.9rem;">「曲をガチャる」を押
+          <p style="color: var(--text-muted); font-size: 0.9rem;">「曲をガチャる」を押して決定！</p>
+        </div>
+
+        <button class="btn btn-primary" id="btnRandomSpin">
+          <i class="fa-solid fa-shuffle"></i> 曲をガチャる！
+        </button>
+      </div>
+
+      <!-- 気分選択カード -->
+      <div class="card">
+        <div class="card-title">
+          <i class="fa-solid fa-heart" style="color: var(--accent);"></i> 今の気分に合わせて選ぶ
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+          <button class="btn btn-outline mood-btn" data-mood="定番・盛り上がる">🔥 アゲアゲで行きたい</button>
+          <button class="btn btn-outline mood-btn" data-mood="爽やか">🍃 爽やかに歌いたい</button>
+          <button class="btn btn-outline mood-btn" data-mood="エモい・切ない">😭 感情込めて浸りたい</button>
+          <button class="btn btn-outline mood-btn" data-mood="バラード・じっくり">🎙️ じっくり聴かせたい</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. 本日のセトリ タブ -->
+    <section id="tab-setlist" class="tab-content">
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <div class="card-title" style="margin-bottom: 0;">
+            <i class="fa-solid fa-list-ol" style="color: var(--primary);"></i> 本日のカラオケセトリ
+          </div>
+          <button class="btn btn-outline btn-sm" id="btnClearSetlist" style="color: var(--accent); border-color: #fecaca;">
+            <i class="fa-solid fa-trash-can"></i> リセット
+          </button>
+        </div>
+        <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 12px;">
+          曲一覧の「＋」ボタンで本日のセトリに追加できます。
+        </p>
+        <div id="setlistContainer"></div>
+      </div>
+    </section>
+
+    <!-- 4. 歌唱記録 タブ -->
+    <section id="tab-history" class="tab-content">
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <div class="card-title" style="margin-bottom: 0;">
+            <i class="fa-solid fa-clock-rotate-left" style="color: #8b5cf6;"></i> 歌った記録
+          </div>
+          <span id="historyCount" style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">0曲達成</span>
+        </div>
+        <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 12px;">
+          曲一覧の「マイクアイコン」をタップすると歌唱記録を残せます。
+        </p>
+        <div id="historyContainer"></div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ボトムナビゲーション -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" data-tab="tab-songs">
+      <i class="fa-solid fa-music"></i>
+      曲を探す
+    </button>
+    <button class="nav-item" data-tab="tab-random">
+      <i class="fa-solid fa-dice"></i>
+      おまかせ
+    </button>
+    <button class="nav-item" data-tab="tab-setlist">
+      <i class="fa-solid fa-list-check"></i>
+      本日のセトリ
+    </button>
+    <button class="nav-item" data-tab="tab-history">
+      <i class="fa-solid fa-clock-rotate-left"></i>
+      歌唱記録
+    </button>
+  </nav>
+
+  <!-- 外部データベースファイルの読み込み（相対パス指定） -->
+  <script src="./songs.js"></script>
+
+  <!-- アプリメイン処理 -->
+  <script>
+    // --- アプリ状態管理 ---
+    let currentSongs = [];
+    let activeTag = "ALL";
+    let historyIds = JSON.parse(localStorage.getItem("ryokuka_history") || "[]");
+    let setlistIds = JSON.parse(localStorage.getItem("ryokuka_setlist") || "[]");
+
+    // DOM要素
+    const songListEl = document.getElementById("songList");
+    const searchInput = document.getElementById("searchInput");
+    const tagFiltersEl = document.getElementById("tagFilters");
+    const damFilterCheck = document.getElementById("damFilterCheck");
+    const songCountBadge = document.getElementById("songCountBadge");
+    const setlistContainer = document.getElementById("setlistContainer");
+    const historyContainer = document.getElementById("historyContainer");
+    const historyCountEl = document.getElementById("historyCount");
+
+    // 初期化処理
+    document.addEventListener("DOMContentLoaded", () => {
+      if (typeof RYOKUSHAKA_SONGS !== 'undefined') {
+        currentSongs = [...RYOKUSHAKA_SONGS];
+      } else {
+        console.error("songs.js が読み込まれていません。");
+      }
+      
+      setupTabs();
+      setupFilters();
+      renderSongs();
+      renderSetlist();
+      renderHistory();
+    });
+
+    // タブ切替機能
+    function setupTabs() {
+      const navItems = document.querySelectorAll(".nav-item");
+      navItems.forEach(item => {
+        item.addEventListener("click", () => {
+          const tabId = item.getAttribute("data-tab");
+          
+          navItems.forEach(n => n.classList.remove("active"));
+          document.querySelectorAll(".tab-content").forEach(tc => tc.classList.remove("active"));
+          
+          item.classList.add("active");
+          document.getElementById(tabId).classList.add("active");
+        });
+      });
+    }
+
+    // フィルタ・検索イベント
+    function setupFilters() {
+      searchInput.addEventListener("input", filterAndRender);
+      damFilterCheck.addEventListener("change", filterAndRender);
+
+      tagFiltersEl.addEventListener("click", (e) => {
+        if (e.target.classList.contains("tag-chip")) {
+          document.querySelectorAll(".tag-chip").forEach(c => c.classList.remove("active"));
+          e.target.classList.add("active");
+          activeTag = e.target.getAttribute("data-tag");
+          filterAndRender();
+        }
+      });
+    }
+
+    // 絞り込み実行＆再描画
+    function filterAndRender() {
+      const keyword = searchInput.value.trim().toLowerCase();
+      const damOnly = damFilterCheck.checked;
+
+      let filtered = RYOKUSHAKA_SONGS.filter(song => {
+        // キーワード検索
+        const matchKeyword = !keyword || (
+          song.title.toLowerCase().includes(keyword) ||
+          song.album.toLowerCase().includes(keyword) ||
+          song.note.toLowerCase().includes(keyword) ||
+          song.tags.some(t => t.toLowerCase().includes(keyword))
+        );
+
+        // タグ検索
+        const matchTag = (activeTag === "ALL") || song.tags.includes(activeTag);
+
+        // DAM確認済みフィルタ
+        const matchDam = !damOnly || (song.damStatus === "確認済み");
+
+        return matchKeyword && matchTag && matchDam;
+      });
+
+      currentSongs = filtered;
+      renderSongs();
+    }
+
+    // 楽曲リストの描画
+    function renderSongs() {
+      songCountBadge.textContent = `全 ${currentSongs.length} 曲`;
+
+      if (currentSongs.length === 0) {
+        songListEl.innerHTML = `
+          <div class="empty-state">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <p>該当する楽曲が見つかりませんでした。</p>
+          </div>
+        `;
+        return;
+      }
+
+      songListEl.innerHTML = currentSongs.map(song => {
+        const isHistory = historyIds.includes(song.id);
+        const isSetlist = setlistIds.includes(song.id);
+        const damBadgeClass = song.damStatus === "確認済み" ? "badge-confirmed" : "badge-unconfirmed";
+
+        return `
+          <div class="song-item">
+            <div class="song-info">
+              <div class="song-title">${escapeHtml(song.title)}</div>
+              <div class="song-meta">
+                <span class="badge ${damBadgeClass}">${song.damStatus}</span>
+                <span>${escapeHtml(song.album || "シングル")}</span>
+                ${song.note ? `<span>• ${escapeHtml(song.note)}</span>` : ''}
+              </div>
+            </div>
+            <div class="song-actions">
+              <button class="icon-btn ${isSetlist ? 'active-setlist' : ''}" onclick="toggleSetlist(${song.id})">
+                <i class="fa-solid ${isSetlist ? 'fa-check' : 'fa-plus'}"></i>
+              </button>
+              <button class="icon-btn ${isHistory ? 'active-history' : ''}" onclick="toggleHistory(${song.id})">
+                <i class="fa-solid fa-microphone"></i>
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 今日のセトリ描画
+    function renderSetlist() {
+      const list = setlistIds.map(id => RYOKUSHAKA_SONGS.find(s => s.id === id)).filter(Boolean);
+
+      if (list.length === 0) {
+        setlistContainer.innerHTML = `
+          <div class="empty-state">
+            <i class="fa-solid fa-list-check"></i>
+            <p>セトリに登録された曲がありません。<br>曲一覧の「＋」で追加できます！</p>
+          </div>
+        `;
+        return;
+      }
+
+      setlistContainer.innerHTML = list.map((song, index) => `
+        <div class="setlist-item">
+          <div class="setlist-number">${index + 1}</div>
+          <div class="song-info">
+            <div class="song-title">${escapeHtml(song.title)}</div>
+            <div class="song-meta">${escapeHtml(song.album || "シングル")}</div>
+          </div>
+          <button class="icon-btn" onclick="toggleSetlist(${song.id})" style="color: var(--accent);">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      `).join('');
+    }
+
+    // 歌唱記録描画
+    function renderHistory() {
+      const list = historyIds.map(id => RYOKUSHAKA_SONGS.find(s => s.id === id)).filter(Boolean);
+      historyCountEl.textContent = `${list.length}曲達成`;
+
+      if (list.length === 0) {
+        historyContainer.innerHTML = `
+          <div class="empty-state">
+            <i class="fa-solid fa-microphone-slash"></i>
+            <p>まだ歌った記録がありません。<br>カラオケで歌ったらマイクを押して記録しよう！</p>
+          </div>
+        `;
+        return;
+      }
+
+      historyContainer.innerHTML = list.map(song => `
+        <div class="song-item">
+          <div class="song-info">
+            <div class="song-title">${escapeHtml(song.title)}</div>
+            <div class="song-meta">${escapeHtml(song.album || "シングル")}</div>
+          </div>
+          <button class="icon-btn active-history" onclick="toggleHistory(${song.id})">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        </div>
+      `).join('');
+    }
+
+    // トグル処理（セトリ追加・削除）
+    window.toggleSetlist = function(id) {
+      if (setlistIds.includes(id)) {
+        setlistIds = setlistIds.filter(i => i !== id);
+      } else {
+        setlistIds.push(id);
+      }
+      localStorage.setItem("ryokuka_setlist", JSON.stringify(setlistIds));
+      renderSongs();
+      renderSetlist();
+    };
+
+    // トグル処理（歌唱記録追加・削除）
+    window.toggleHistory = function(id) {
+      if (historyIds.includes(id)) {
+        historyIds = historyIds.filter(i => i !== id);
+      } else {
+        historyIds.push(id);
+      }
+      localStorage.setItem("ryokuka_history", JSON.stringify(historyIds));
+      renderSongs();
+      renderHistory();
+    };
+
+    // セトリリセット
+    document.getElementById("btnClearSetlist").addEventListener("click", () => {
+      if (setlistIds.length === 0) return;
+      if (confirm("本日のセトリをクリアしますか？")) {
+        setlistIds = [];
+        localStorage.setItem("ryokuka_setlist", JSON.stringify(setlistIds));
+        renderSongs();
+        renderSetlist();
+      }
+    });
+
+    // ランダム決定ガチャ
+    document.getElementById("btnRandomSpin").addEventListener("click", () => {
+      if (RYOKUSHAKA_SONGS.length === 0) return;
+
+      const randomDisplay = document.getElementById("randomResult");
+      let counter = 0;
+      const interval = setInterval(() => {
+        const randTemp = RYOKUSHAKA_SONGS[Math.floor(Math.random() * RYOKUSHAKA_SONGS.length)];
+        randomDisplay.innerHTML = `
+          <div class="random-song-title" style="opacity: 0.5;">${escapeHtml(randTemp.title)}</div>
+        `;
+        counter++;
+        if (counter > 10) {
+          clearInterval(interval);
+          const selected = RYOKUSHAKA_SONGS[Math.floor(Math.random() * RYOKUSHAKA_SONGS.length)];
+          randomDisplay.innerHTML = `
+            <div class="random-song-title">${escapeHtml(selected.title)}</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted);">${escapeHtml(selected.album || "")}</div>
+            <div style="margin-top: 10px; display: flex; gap: 8px;">
+              <button class="btn btn-outline btn-sm" onclick="toggleSetlist(${selected.id})">
+                <i class="fa-solid fa-plus"></i> セトリに追加
+              </button>
+            </div>
+          `;
+        }
+      }, 50);
+    });
+
+    // 気分指定でのランダム選曲
+    document.querySelectorAll(".mood-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const mood = btn.getAttribute("data-mood");
+        const matched = RYOKUSHAKA_SONGS.filter(s => s.tags.includes(mood));
+        const randomDisplay = document.getElementById("randomResult");
+
+        if (matched.length > 0) {
+          const selected = matched[Math.floor(Math.random() * matched.length)];
+          randomDisplay.innerHTML = `
+            <div style="font-size: 0.75rem; color: var(--primary); font-weight: 700; margin-bottom: 4px;">気分: ${mood}</div>
+            <div class="random-song-title">${escapeHtml(selected.title)}</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted);">${escapeHtml(selected.album || "")}</div>
+            <div style="margin-top: 10px; display: flex; gap: 8px;">
+              <button class="btn btn-outline btn-sm" onclick="toggleSetlist(${selected.id})">
+                <i class="fa-solid fa-plus"></i> セトリに追加
+              </button>
+            </div>
+          `;
+        }
+      });
+    });
+
+    // HTMLエスケープヘルパー
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/[&<>"']/g, m => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      })[m]);
+    }
+  </script>
+</body>
+</html>
