@@ -81,7 +81,7 @@ const RYOKUSHAKA_SONGS = [
   { id: 57, title: "視線", album: "Pink Blue", tags: ["エモい・切ない"], note: "", damStatus: "未確認" },
   { id: 58, title: "アラモードにワルツ", album: "Actor", tags: ["かわいい・おしゃれ", "ポップ"], note: "", damStatus: "未確認" },
   { id: 59, title: "スクリーンと横顔", album: "Actor", tags: ["エモい・切ない", "バラード・じっくり"], note: "", damStatus: "未確認" },
-  { id: 60, title: "Anxiety", album: "Actor", tags: ["かっこいい", "ディープ"], note: "", damStatus: "未確認" },
+  { id: 60, title: "安心してね", album: "Actor", tags: ["かっこいい", "ディープ"], note: "", damStatus: "未確認" },
   { id: 61, title: "一歩", album: "SINGALONG", tags: ["バラード・じっくり"], note: "", damStatus: "未確認" },
   { id: 62, title: "愛のかたち", album: "SINGALONG", tags: ["バラード・じっくり", "エモい・切ない"], note: "", damStatus: "未確認" },
   { id: 63, title: "幸せ", album: "SINGALONG", tags: ["バラード・じっくり", "エモい・切ない"], note: "", damStatus: "未確認" },
